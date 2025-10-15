@@ -2,7 +2,7 @@ import json
 
 def process_conversation_file(file_path):
     """
-    Reads a conversation file, extracts the user and model chunks,
+    Reads a conversation file, extracts the user and model chunks (including images),
     and returns them as a list of dictionaries.
 
     Args:
@@ -10,8 +10,8 @@ def process_conversation_file(file_path):
 
     Returns:
         list: A list of dictionaries, where each dictionary represents a
-              conversation chunk with "user_text" and "model_text".
-              Returns an empty list if an error occurs.
+              conversation part. It can contain 'user_text', 'model_text',
+              and/or 'model_image'. Returns an empty list if an error occurs.
 
     Raises:
         ValueError: If the file content is invalid (e.g., no JSON found).
@@ -30,27 +30,41 @@ def process_conversation_file(file_path):
 
         chunks = json_data.get("chunkedPrompt", {}).get("chunks", [])
 
-        conversation_pairs = []
+        conversation_parts = []
         user_prompt = None
 
         for chunk in chunks:
             role = chunk.get("role")
-            text = chunk.get("text", "").strip()
             is_thought = chunk.get("isThought", False)
 
-            if role == "user":
-                # Store the user's prompt and wait for the model's response
-                user_prompt = text
-            elif role == "model" and not is_thought and user_prompt is not None:
-                # Once we have a model response, pair it with the last user prompt
-                conversation_pairs.append({
-                    "user_text": user_prompt,
-                    "model_text": text
-                })
-                # Reset user_prompt to ensure we don't reuse it
-                user_prompt = None
+            if is_thought:
+                continue  # Skip thoughts
 
-        return conversation_pairs
+            if role == "user":
+                user_prompt = chunk.get("text", "").strip()
+
+            elif role == "model":
+                # Determine if we have a pending user prompt to pair with
+                current_user_text = user_prompt if user_prompt is not None else ""
+
+                part = {
+                    "user_text": current_user_text,
+                    "model_text": "", # Default to empty
+                }
+
+                if "text" in chunk:
+                    part["model_text"] = chunk.get("text", "").strip()
+
+                if "inlineImage" in chunk:
+                    part["model_image"] = chunk["inlineImage"]
+
+                conversation_parts.append(part)
+
+                # A user prompt is only used for the first model response that follows it
+                if user_prompt is not None:
+                    user_prompt = None
+
+        return conversation_parts
 
     except FileNotFoundError:
         print(f"Error: The file '{file_path}' was not found.")
