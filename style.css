@@ -15,8 +15,11 @@ body {
 }
 
 /* --- Heading Styles --- */
-h1 {
-    font-size: 12pt; /* Slightly smaller than body for a subtle look */
+.heading-container h1 {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12pt;
     font-weight: bold;
     color: #000;
     margin-top: 0;
@@ -25,9 +28,15 @@ h1 {
     border-bottom: 1px solid #eaeaea;
 }
 
+.response-number {
+    font-weight: bold;
+    font-size: 12pt;
+    color: #000;
+}
+
 /* --- Spacing Fix --- */
 /* This ensures the very first element on the page has no extra space above it */
-h1:first-child {
+.heading-container:first-child h1 {
     margin-top: 0;
 }
 
@@ -36,4 +45,32 @@ p {
     margin-top: 0;
     margin-bottom: 1em;
     /* The browser engine will handle line breaks correctly, so pre-wrap is not needed */
+}
+
+/* --- Content Wrapper --- */
+.content {
+    /* This class is a wrapper for the markdown-generated content */
+}
+
+/* --- Table Styles --- */
+.content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+    font-size: 11pt;
+}
+
+.content th, .content td {
+    border: 1px solid #cccccc;
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.content th {
+    background-color: #f2f2f2;
+    font-weight: bold;
+}
+
+.content tr:nth-child(even) {
+    background-color: #f9f9f9;
 }

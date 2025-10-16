@@ -198,6 +198,8 @@ class PdfWorker(QObject):
                 user_text = chunk.get("user_text", "") if chunk.get("include_user", False) else ""
                 model_text = chunk.get("model_text", "") if chunk.get("include_model", False) else ""
                 model_image = chunk.get("model_image") if chunk.get("include_model", False) else None
+                user_response_num = chunk.get("user_response_num")
+                model_response_num = chunk.get("model_response_num")
 
                 if not user_text and not model_text and not model_image:
                     continue
@@ -210,7 +212,9 @@ class PdfWorker(QObject):
                     output_path=temp_page_path,
                     show_headings=self.show_headings,
                     user_heading=self.user_heading,
-                    model_heading=self.model_heading
+                    model_heading=self.model_heading,
+                    user_response_num=user_response_num,
+                    model_response_num=model_response_num
                 )
                 merge_pdfs(self.main_pdf_path, temp_page_path)
 
@@ -303,6 +307,10 @@ class MainWindow(QMainWindow):
             self.status_label.setText("Status: Processing folder...")
             QApplication.processEvents() # Update UI
 
+            # Initialize a counter for the entire batch
+            response_counter = 1
+            all_selected_chunks = []
+
             for file_name in selected_files:
                 file_path = os.path.join(folder_path, file_name)
                 self.status_label.setText(f"Status: Processing {file_name}...")
@@ -317,10 +325,23 @@ class MainWindow(QMainWindow):
                     chunk_dialog = ChunkSelectionDialog(chunks, file_name, self)
                     if chunk_dialog.exec():
                         selected_chunks = chunk_dialog.get_selected_chunks()
-                        self.process_selected_chunks(selected_chunks)
+
+                        # Add numbering to the selected chunks
+                        for chunk in selected_chunks:
+                            if chunk.get("include_user") and chunk.get("user_text"):
+                                chunk["user_response_num"] = response_counter
+                                response_counter += 1
+                            if chunk.get("include_model") and (chunk.get("model_text") or chunk.get("model_image")):
+                                chunk["model_response_num"] = response_counter
+                                response_counter += 1
+                        all_selected_chunks.extend(selected_chunks)
 
                 except Exception as e:
                     QMessageBox.critical(self, "Error Processing File", f"Could not process {file_name}: {e}")
+
+            # Process all chunks from all files at once
+            if all_selected_chunks:
+                self.process_selected_chunks(all_selected_chunks)
 
             self.status_label.setText("Status: Folder processing complete.")
             self.add_button.setEnabled(True)

@@ -2,6 +2,7 @@ import os
 import subprocess
 from pypdf import PdfWriter, PdfReader
 import html
+import markdown
 
 def merge_pdfs(main_pdf_path, new_page_path):
     """Merges a new page into the main PDF."""
@@ -29,7 +30,7 @@ def merge_pdfs(main_pdf_path, new_page_path):
         if os.path.exists(new_page_path):
             os.remove(new_page_path)
 
-def create_pdf_page(user_text, model_text, output_path, model_image=None, show_headings=True, user_heading="User Message", model_heading="Model Response"):
+def create_pdf_page(user_text, model_text, output_path, model_image=None, show_headings=True, user_heading="User Message", model_heading="Model Response", user_response_num=None, model_response_num=None):
     """
     Creates a styled PDF page by calling the Puppeteer Node.js script.
     Handles text and an optional image.
@@ -46,20 +47,25 @@ def create_pdf_page(user_text, model_text, output_path, model_image=None, show_h
         user_section = ""
         if user_text:
             if show_headings and user_heading:
-                user_section += f"<h1>{html.escape(user_heading)}</h1>"
-            user_text_html = html.escape(user_text).replace('\n', '<br>')
-            user_section += f"<p>{user_text_html}</p>"
+                heading_html = f"<span>{html.escape(user_heading)}</span>"
+                if user_response_num is not None:
+                    heading_html += f"<span class='response-number'>{user_response_num}</span>"
+                user_section += f"<div class='heading-container'><h1>{heading_html}</h1></div>"
+            user_text_html = markdown.markdown(user_text, extensions=['tables', 'nl2br'])
+            user_section += f"<div class='content'>{user_text_html}</div>"
 
         model_section = ""
         if model_text or model_image:
             if show_headings and model_heading:
-                # Add heading only if there's text or if it's just an image
                 if model_text or (model_image and not model_text):
-                     model_section += f"<h1>{html.escape(model_heading)}</h1>"
+                    heading_html = f"<span>{html.escape(model_heading)}</span>"
+                    if model_response_num is not None:
+                        heading_html += f"<span class='response-number'>{model_response_num}</span>"
+                    model_section += f"<div class='heading-container'><h1>{heading_html}</h1></div>"
 
             if model_text:
-                model_text_html = html.escape(model_text).replace('\n', '<br>')
-                model_section += f"<p>{model_text_html}</p>"
+                model_text_html = markdown.markdown(model_text, extensions=['tables', 'nl2br'])
+                model_section += f"<div class='content'>{model_text_html}</div>"
 
             if model_image:
                 try:
