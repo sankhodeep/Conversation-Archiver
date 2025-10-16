@@ -46,14 +46,17 @@ class FileSelectionDialog(QDialog):
 
 # --- Chunk Widget for Selection Dialog ---
 class ChunkWidgetItem(QWidget):
-    def __init__(self, chunk_number, user_text, model_text, parent=None):
+    def __init__(self, chunk_number, user_text, model_text, has_image, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(10, 10, 10, 10)
 
         # --- Main Checkbox and Title ---
         title_layout = QHBoxLayout()
-        self.main_check = QCheckBox(f"Chunk {chunk_number}")
+        title = f"Chunk {chunk_number}"
+        if has_image:
+            title += " (Image)"
+        self.main_check = QCheckBox(title)
         self.main_check.setChecked(True)
         self.main_check.stateChanged.connect(self.toggle_sub_checks)
         title_layout.addWidget(self.main_check)
@@ -64,11 +67,13 @@ class ChunkWidgetItem(QWidget):
         self.user_check.setChecked(True)
         self.user_text_preview = QLabel(f"<i>User:</i> {user_text[:100]}...")
         self.user_text_preview.setWordWrap(True)
+        self.user_text_preview.setVisible(bool(user_text))
 
         self.model_check = QCheckBox("Include Model")
         self.model_check.setChecked(True)
         self.model_text_preview = QLabel(f"<i>Model:</i> {model_text[:100]}...")
         self.model_text_preview.setWordWrap(True)
+        self.model_text_preview.setVisible(bool(model_text or has_image)) # Show if text or image
 
         sub_layout = QVBoxLayout()
         sub_layout.setContentsMargins(20, 0, 0, 0)
@@ -124,7 +129,12 @@ class ChunkSelectionDialog(QDialog):
 
         # --- Populate with Chunk Widgets ---
         for i, chunk in enumerate(self.chunks):
-            widget = ChunkWidgetItem(i + 1, chunk["user_text"], chunk["model_text"])
+            widget = ChunkWidgetItem(
+                i + 1,
+                chunk.get("user_text", ""),
+                chunk.get("model_text", ""),
+                "model_image" in chunk
+            )
             self.list_layout.addWidget(widget)
             self.chunk_widgets.append(widget)
 
@@ -151,12 +161,16 @@ class ChunkSelectionDialog(QDialog):
         for i, widget in enumerate(self.chunk_widgets):
             selection_state = widget.get_selection()
             if selection_state:
-                selected.append({
-                    "user_text": self.chunks[i]["user_text"],
-                    "model_text": self.chunks[i]["model_text"],
+                original_chunk = self.chunks[i]
+                new_chunk = {
+                    "user_text": original_chunk.get("user_text", ""),
+                    "model_text": original_chunk.get("model_text", ""),
                     "include_user": selection_state["include_user"],
                     "include_model": selection_state["include_model"]
-                })
+                }
+                if "model_image" in original_chunk:
+                    new_chunk["model_image"] = original_chunk["model_image"]
+                selected.append(new_chunk)
         return selected
 
 # --- Communication object for worker thread ---
@@ -183,14 +197,20 @@ class PdfWorker(QObject):
 
                 user_text = chunk.get("user_text", "") if chunk.get("include_user", False) else ""
                 model_text = chunk.get("model_text", "") if chunk.get("include_model", False) else ""
+                model_image = chunk.get("model_image") if chunk.get("include_model", False) else None
 
-                if not user_text and not model_text:
+                if not user_text and not model_text and not model_image:
                     continue
 
                 temp_page_path = "_temp_page.pdf"
                 create_pdf_page(
-                    user_text, model_text, temp_page_path,
-                    self.show_headings, self.user_heading, self.model_heading
+                    user_text=user_text,
+                    model_text=model_text,
+                    model_image=model_image,
+                    output_path=temp_page_path,
+                    show_headings=self.show_headings,
+                    user_heading=self.user_heading,
+                    model_heading=self.model_heading
                 )
                 merge_pdfs(self.main_pdf_path, temp_page_path)
 
