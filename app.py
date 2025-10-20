@@ -15,7 +15,22 @@ from file_processor import process_conversation_file
 
 # --- File Selection Dialog ---
 class FileSelectionDialog(QDialog):
+    """A dialog for selecting, unselecting, and reordering files for batch processing.
+
+    This dialog displays a list of files found in a selected folder. Users can
+    uncheck files to exclude them from the batch and use drag-and-drop to
+    change the processing order.
+
+    Attributes:
+        list_widget (QListWidget): A widget to display the list of files.
+    """
     def __init__(self, files, parent=None):
+        """Initializes the FileSelectionDialog.
+
+        Args:
+            files (list[str]): A list of file names to display.
+            parent (QWidget, optional): The parent widget. Defaults to None.
+        """
         super().__init__(parent)
         self.setWindowTitle("Select and Order Files")
         self.setGeometry(200, 200, 500, 600)
@@ -39,6 +54,11 @@ class FileSelectionDialog(QDialog):
         layout.addWidget(button_box)
 
     def get_selected_files_in_order(self):
+        """Retrieves the list of files that are checked, in their current display order.
+
+        Returns:
+            list[str]: An ordered list of the selected file names.
+        """
         selected_files = []
         for i in range(self.list_widget.count()):
             item = self.list_widget.item(i)
@@ -48,7 +68,27 @@ class FileSelectionDialog(QDialog):
 
 # --- Chunk Widget for Selection Dialog ---
 class ChunkWidgetItem(QWidget):
+    """A custom widget to display a single conversation chunk in the selection dialog.
+
+    This widget includes a main checkbox to include/exclude the entire chunk,
+    and sub-checkboxes to include/exclude the user and model parts individually.
+    It also shows a preview of the text content.
+
+    Attributes:
+        main_check (QCheckBox): The primary checkbox to toggle the whole chunk.
+        user_check (QCheckBox): Checkbox to include the user's message.
+        model_check (QCheckBox): Checkbox to include the model's response.
+    """
     def __init__(self, chunk_number, user_text, model_text, has_image, parent=None):
+        """Initializes the ChunkWidgetItem.
+
+        Args:
+            chunk_number (int): The sequential number of the chunk.
+            user_text (str): The text from the user's part of the conversation.
+            model_text (str): The text from the model's part of the conversation.
+            has_image (bool): True if the model's response includes an image.
+            parent (QWidget, optional): The parent widget. Defaults to None.
+        """
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(10, 10, 10, 10)
@@ -86,11 +126,22 @@ class ChunkWidgetItem(QWidget):
         self.layout.addLayout(sub_layout)
 
     def toggle_sub_checks(self, state):
+        """Enables or disables sub-checkboxes based on the main checkbox's state.
+
+        Args:
+            state (int): The Qt.CheckState of the main checkbox.
+        """
         is_checked = state == Qt.Checked
         self.user_check.setEnabled(is_checked)
         self.model_check.setEnabled(is_checked)
 
     def get_selection(self):
+        """Gets the user's selection for this chunk.
+
+        Returns:
+            dict or None: A dictionary with 'include_user' and 'include_model'
+            booleans if the main checkbox is checked, otherwise None.
+        """
         if not self.main_check.isChecked():
             return None
         return {
@@ -100,7 +151,24 @@ class ChunkWidgetItem(QWidget):
 
 # --- Chunk Selection Dialog ---
 class ChunkSelectionDialog(QDialog):
+    """A dialog for selecting which conversation chunks from a file to include in the PDF.
+
+    This dialog displays a scrollable list of `ChunkWidgetItem` instances, allowing
+    the user to make fine-grained selections. It also includes a feature to
+    select all chunks from a certain number onwards.
+
+    Attributes:
+        chunks (list[dict]): The raw chunk data from the processed file.
+        chunk_widgets (list[ChunkWidgetItem]): The list of widget instances created.
+    """
     def __init__(self, chunks, file_name, parent=None):
+        """Initializes the ChunkSelectionDialog.
+
+        Args:
+            chunks (list[dict]): A list of conversation chunks.
+            file_name (str): The name of the file being processed.
+            parent (QWidget, optional): The parent widget. Defaults to None.
+        """
         super().__init__(parent)
         self.setWindowTitle(f"Select Chunks for: {file_name}")
         self.setGeometry(150, 150, 800, 700)
@@ -147,11 +215,13 @@ class ChunkSelectionDialog(QDialog):
         main_layout.addWidget(button_box)
 
     def apply_start_from(self):
+        """Checks all chunks from the specified number onwards."""
         try:
             start_num = int(self.start_from_edit.text())
             for i, widget in enumerate(self.chunk_widgets):
                 is_checked = (i + 1) >= start_num
                 widget.main_check.setChecked(is_checked)
+                # Also reset sub-checks to their default state
                 widget.user_check.setChecked(True)
                 widget.model_check.setChecked(True)
 
@@ -159,6 +229,13 @@ class ChunkSelectionDialog(QDialog):
             QMessageBox.warning(self, "Invalid Input", "Please enter a valid number.")
 
     def get_selected_chunks(self):
+        """Constructs a list of selected chunks based on the user's choices.
+
+        Returns:
+            list[dict]: A list of chunk dictionaries, formatted for the PDF
+            worker. Each dictionary includes the original text/image data
+            plus the user's include/exclude choices.
+        """
         selected = []
         for i, widget in enumerate(self.chunk_widgets):
             selection_state = widget.get_selection()
@@ -177,22 +254,48 @@ class ChunkSelectionDialog(QDialog):
 
 # --- Communication object for worker thread ---
 class WorkerSignals(QObject):
-    finished = Signal(str)  # Emits a string message on completion or error
-    progress = Signal(str) # Emits a progress update message
+    """Defines the signals available from a running worker thread.
+
+    Attributes:
+        finished (Signal): Emits a string message on completion or error.
+        progress (Signal): Emits a string message for progress updates.
+    """
+    finished = Signal(str)
+    progress = Signal(str)
 
 class PdfWorker(QObject):
-    """Worker thread for creating and merging PDFs to keep the UI responsive."""
+    """Worker thread for creating and merging PDFs to keep the UI responsive.
+
+    This worker processes tasks from a queue in a separate thread, emitting
+    signals to update the UI without freezing it.
+
+    Attributes:
+        signals (WorkerSignals): An object containing signals for communication.
+        task_queue (queue.Queue): The queue from which to fetch PDF generation tasks.
+        is_running (bool): A flag to control the execution loop.
+    """
     def __init__(self, task_queue):
+        """Initializes the PdfWorker.
+
+        Args:
+            task_queue (queue.Queue): The queue to process tasks from.
+        """
         super().__init__()
         self.signals = WorkerSignals()
         self.task_queue = task_queue
         self.is_running = True
 
     def run(self):
+        """The main execution loop for the worker thread.
+
+        Continuously fetches tasks from the queue and processes them.
+        Handles PDF page creation for recovery info and conversation chunks,
+        then merges them into the main PDF. Exits when `is_running` is False.
+        """
         while self.is_running:
             try:
-                task = self.task_queue.get(timeout=1) # Wait 1 sec
-                if task is None: # Sentinel value to stop
+                task = self.task_queue.get(timeout=1)
+                if task is None:  # Sentinel value to stop
                     self.is_running = False
                     continue
 
@@ -243,11 +346,19 @@ class PdfWorker(QObject):
         self.signals.finished.emit("All tasks completed successfully!")
 
     def stop(self):
+        """Stops the worker thread's execution loop."""
         self.is_running = False
 
 # --- Main Application Window ---
 class MainWindow(QMainWindow):
+    """The main application window for the Conversation Archiver.
+
+    This class sets up the entire GUI, manages user interactions, handles
+    configuration saving/loading, and coordinates the background PDF
+    generation tasks with the `PdfWorker`.
+    """
     def __init__(self):
+        """Initializes the MainWindow, sets up the UI, and connects signals."""
         super().__init__()
         self.setWindowTitle("Conversation Archiver")
         self.setGeometry(100, 100, 700, 800)
@@ -384,14 +495,16 @@ class MainWindow(QMainWindow):
 
 
     def _load_all_configs(self):
+        """Loads all named configurations from the JSON file."""
         if os.path.exists(self.config_file):
             try:
                 with open(self.config_file, 'r') as f:
                     self.configs = json.load(f)
             except (json.JSONDecodeError, IOError):
-                self.configs = {} # Start fresh if file is corrupt
+                self.configs = {}  # Start fresh if file is corrupt
 
     def _save_all_configs(self):
+        """Saves all named configurations to the JSON file."""
         try:
             with open(self.config_file, 'w') as f:
                 json.dump(self.configs, f, indent=4)
@@ -399,11 +512,13 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Error", f"Could not save configs to file: {e}")
 
     def _populate_configs_combo(self):
+        """Clears and repopulates the configurations dropdown."""
         self.config_combo.clear()
-        self.config_combo.addItem("Select a config...") # Placeholder
+        self.config_combo.addItem("Select a config...")  # Placeholder
         self.config_combo.addItems(sorted(self.configs.keys()))
 
     def save_configuration(self):
+        """Prompts the user for a name and saves the current UI settings as a configuration."""
         config_name, ok = QInputDialog.getText(self, "Save Configuration", "Enter a name for this configuration:")
         if ok and config_name:
             self.configs[config_name] = {
@@ -419,6 +534,7 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Success", f"Configuration '{config_name}' saved.")
 
     def load_configuration(self):
+        """Loads the selected configuration from the dropdown and applies its settings to the UI."""
         config_name = self.config_combo.currentText()
         if config_name and config_name != "Select a config...":
             config_data = self.configs.get(config_name)
@@ -430,6 +546,7 @@ class MainWindow(QMainWindow):
                 self.model_heading_entry.setText(config_data.get("model_heading", "Model Response"))
 
     def delete_configuration(self):
+        """Deletes the currently selected configuration after confirming with the user."""
         config_name = self.config_combo.currentText()
         if config_name and config_name != "Select a config...":
             reply = QMessageBox.question(self, "Delete Configuration",
@@ -443,15 +560,16 @@ class MainWindow(QMainWindow):
                     QMessageBox.information(self, "Success", f"Configuration '{config_name}' deleted.")
 
     def choose_md_file(self):
+        """Opens a file dialog for the user to select the single markdown file for a batch."""
         filepath, _ = QFileDialog.getOpenFileName(self, "Select Markdown File", "", "Markdown Files (*.md)")
         if filepath:
             self.md_file_name_label.setText(os.path.basename(filepath))
-            # Store the full path in a separate variable if needed, e.g.,
+            # Store the full path to be used when creating recovery pages.
             self.md_full_path = filepath
         self._update_batch_button_state()
 
     def _update_batch_button_state(self):
-        """Enable or disable the batch processing button based on field content."""
+        """Enables or disables the 'Import from Folder' button based on field content."""
         is_valid = all([
             self.chat_platform_combo.currentText().strip(),
             self.chat_link_entry.text().strip(),
@@ -460,13 +578,20 @@ class MainWindow(QMainWindow):
         ])
         self.import_folder_button.setEnabled(is_valid)
 
-
     def choose_file(self):
+        """Opens a file dialog for the user to select the main destination PDF file."""
         filepath, _ = QFileDialog.getOpenFileName(self, "Select Your Main PDF File", "", "PDF Files (*.pdf)")
         if filepath:
             self.pdf_path_label.setText(filepath)
 
     def choose_folder(self):
+        """Handles the 'Import from Folder' workflow.
+
+        This method prompts the user to select a folder, then presents the
+        `FileSelectionDialog` and `ChunkSelectionDialog` to let the user
+        curate the content. It then queues all selected content for PDF
+        generation by the worker thread.
+        """
         folder_path = QFileDialog.getExistingDirectory(self, "Select Folder Containing Conversation Files")
         if not folder_path:
             return
@@ -560,7 +685,13 @@ class MainWindow(QMainWindow):
 
 
     def process_selected_chunks(self, chunks, recovery_info=None):
-        """Adds a single PDF generation task to the worker queue."""
+        """Adds a single PDF generation task to the worker queue.
+
+        Args:
+            chunks (list[dict]): A list of conversation chunks to be added to the PDF.
+            recovery_info (dict, optional): A dictionary of recovery metadata.
+                Defaults to None.
+        """
         if not chunks and not recovery_info:
             return
 
@@ -584,6 +715,11 @@ class MainWindow(QMainWindow):
 
 
     def process_and_add_pdf(self):
+        """Handles the 'Add to PDF' button click for single, manual entries.
+
+        It takes the text from the main text boxes, packages it as a single
+        "chunk," and queues it for processing.
+        """
         user_text = self.user_text_box.toPlainText().strip()
         model_text = self.model_text_box.toPlainText().strip()
 
@@ -602,10 +738,22 @@ class MainWindow(QMainWindow):
 
 
     def update_status(self, message):
+        """Updates the status label with a message from the worker thread.
+
+        Args:
+            message (str): The status message to display.
+        """
         self.status_label.setText(f"Status: {message}")
 
-
     def on_processing_finished(self, message):
+        """Handles the 'finished' signal from the worker thread.
+
+        It displays an error if one occurred, otherwise it clears the text boxes
+        and updates the status. It re-enables the 'Add to PDF' button.
+
+        Args:
+            message (str): The final message from the worker.
+        """
         if "Error" in message:
             QMessageBox.critical(self, "Error", message)
             self.status_label.setText("Status: Error!")
@@ -619,14 +767,19 @@ class MainWindow(QMainWindow):
         self.add_button.setEnabled(True)
 
     def closeEvent(self, event):
-        """Ensure the worker thread is stopped gracefully."""
+        """Ensures the worker thread is stopped gracefully when the window is closed.
+
+        Args:
+            event (QCloseEvent): The close event.
+        """
         self.worker.stop()
-        self.task_queue.put(None) # Sentinel to unblock the worker's get()
+        self.task_queue.put(None)  # Sentinel to unblock the worker's get()
         self.thread.join()
         event.accept()
 
 
 def main():
+    """The main entry point for the application."""
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

@@ -5,7 +5,19 @@ import html
 import markdown
 
 def merge_pdfs(main_pdf_path, new_page_path):
-    """Merges a new page into the main PDF."""
+    """Merges a new PDF page into a main PDF file.
+
+    If the main PDF does not exist, the new page is renamed to become the main
+    PDF. Otherwise, the new page is appended to the existing pages. The new
+    page file is always deleted after the operation.
+
+    Args:
+        main_pdf_path (str): The file path for the primary PDF document.
+        new_page_path (str): The file path for the new PDF page to be merged.
+
+    Returns:
+        bool: True if the merge was successful, False otherwise.
+    """
     try:
         if not os.path.exists(main_pdf_path):
             os.rename(new_page_path, main_pdf_path)
@@ -31,7 +43,16 @@ def merge_pdfs(main_pdf_path, new_page_path):
             os.remove(new_page_path)
 
 def format_recovery_info(recovery_info):
-    """Formats the recovery information into a styled HTML block."""
+    """Formats the recovery information dictionary into a styled HTML table.
+
+    Args:
+        recovery_info (dict or None): A dictionary containing the recovery
+            metadata for a conversation file.
+
+    Returns:
+        str: A string of HTML representing the formatted table, or an empty
+        string if `recovery_info` is None.
+    """
     if not recovery_info:
         return ""
 
@@ -61,9 +82,33 @@ def format_recovery_info(recovery_info):
     return html_block
 
 def create_pdf_page(user_text, model_text, output_path, model_image=None, show_headings=True, user_heading="User Message", model_heading="Model Response", user_response_num=None, model_response_num=None, recovery_info=None):
-    """
-    Creates a styled PDF page by calling the Puppeteer Node.js script.
-    Handles text and an optional image.
+    """Creates a single, styled PDF page from text and optional image data.
+
+    This function generates a temporary HTML file with embedded CSS, populates it
+    with the provided conversation data and recovery information, and then calls
+    a Node.js script which uses Puppeteer to render the HTML into a PDF file.
+
+    Args:
+        user_text (str): The text of the user's message.
+        model_text (str): The text of the model's response.
+        output_path (str): The file path where the generated PDF page will be saved.
+        model_image (dict, optional): A dictionary containing 'mimeType' and base64
+            'data' for an image. Defaults to None.
+        show_headings (bool, optional): Whether to include headings for user/model
+            sections. Defaults to True.
+        user_heading (str, optional): The text for the user message heading.
+            Defaults to "User Message".
+        model_heading (str, optional): The text for the model response heading.
+            Defaults to "Model Response".
+        user_response_num (int, optional): The sequential number for the user's
+            response. Defaults to None.
+        model_response_num (int, optional): The sequential number for the model's
+            response. Defaults to None.
+        recovery_info (dict, optional): A dictionary of recovery metadata to be
+            included at the top of the page. Defaults to None.
+
+    Returns:
+        bool: True if the PDF page was created successfully, False otherwise.
     """
     temp_html_path = os.path.join(os.path.dirname(__file__), '_temp.html')
 
