@@ -30,13 +30,43 @@ def merge_pdfs(main_pdf_path, new_page_path):
         if os.path.exists(new_page_path):
             os.remove(new_page_path)
 
-def create_pdf_page(user_text, model_text, output_path, model_image=None, show_headings=True, user_heading="User Message", model_heading="Model Response", user_response_num=None, model_response_num=None):
+def format_recovery_info(recovery_info):
+    """Formats the recovery information into a styled HTML block."""
+    if not recovery_info:
+        return ""
+
+    # Start building the HTML content
+    html_block = "<div class='recovery-info'><h2>Recovery Information</h2><table>"
+
+    # Define the desired order and display names for keys
+    key_map = {
+        "chat_platform": "Chat Platform",
+        "chat_link": "Chat Link",
+        "chat_account": "Chat Account",
+        "export_file_name": "Export File Name",
+        "export_file_location": "Export File Location",
+        "md_file_name": "MD File Name",
+        "md_file_location": "MD File Location",
+        "extra_notes": "Extra Notes"
+    }
+
+    for key, display_name in key_map.items():
+        value = recovery_info.get(key)
+        if value:  # Only add a row if the value exists
+            # Escape the value to prevent HTML injection issues
+            escaped_value = html.escape(str(value))
+            html_block += f"<tr><td class='key'>{display_name}:</td><td class='value'>{escaped_value}</td></tr>"
+
+    html_block += "</table></div>"
+    return html_block
+
+def create_pdf_page(user_text, model_text, output_path, model_image=None, show_headings=True, user_heading="User Message", model_heading="Model Response", user_response_num=None, model_response_num=None, recovery_info=None):
     """
     Creates a styled PDF page by calling the Puppeteer Node.js script.
     Handles text and an optional image.
     """
     temp_html_path = os.path.join(os.path.dirname(__file__), '_temp.html')
-    
+
     try:
         # --- 1. Read CSS Content ---
         css_path = os.path.join(os.path.dirname(__file__), 'style.css')
@@ -44,6 +74,8 @@ def create_pdf_page(user_text, model_text, output_path, model_image=None, show_h
             css_content = f.read()
 
         # --- 2. Prepare HTML Content ---
+        recovery_section = format_recovery_info(recovery_info)
+
         user_section = ""
         if user_text:
             if show_headings and user_heading:
@@ -96,6 +128,7 @@ def create_pdf_page(user_text, model_text, output_path, model_image=None, show_h
             </style>
         </head>
         <body>
+            {recovery_section}
             {user_section}
             {model_section}
         </body>
