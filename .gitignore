@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+
+# Temporary files
+_temp.html
+_temp_page.pdf
+
+# Build artifacts
+build/
+
+# Node.js
+node_modules/
+
+# VS Code
+.vscode/
+
+# Other
+My_AI_Notes_TEST.pdf
+# Distribution artifacts
+dist/

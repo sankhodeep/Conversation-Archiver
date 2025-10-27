@@ -1,0 +1,53 @@
+/* --- Page Layout --- */
+@page {
+    margin: 1cm; /* Ensures every page has a 1cm margin */
+}
+
+/* --- General Body and Font Styling --- */
+body {
+    /* This font stack tells the browser to use Roboto for text, but fall back to Noto Color Emoji for any characters (emojis) that Roboto doesn't have. */
+    font-family: 'Roboto', 'Noto Color Emoji', sans-serif;
+    font-size: 13pt;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #1a1a1a;
+    margin: 0; /* Page margins are now handled by the @page rule */
+}
+
+/* --- Heading Styles --- */
+h1 {
+    font-size: 12pt; /* Slightly smaller than body for a subtle look */
+    font-weight: bold;
+    color: #000;
+    margin-top: 0;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 1px solid #eaeaea;
+}
+
+/* --- Spacing Fix --- */
+/* This ensures the very first element on the page has no extra space above it */
+h1:first-child {
+    margin-top: 0;
+}
+
+/* --- Paragraph and Text Styling --- */
+p {
+    margin-top: 0;
+    margin-bottom: 1em;
+    /* The browser engine will handle line breaks correctly, so pre-wrap is not needed */
+}
+/* --- Code Block Styling --- */
+pre {
+    background-color: #f4f4f4; /* Light gray background */
+    border: 1px solid #ddd;     /* Subtle border */
+    border-radius: 4px;         /* Rounded corners */
+    padding: 1em;               /* A little space around the code */
+    white-space: pre-wrap;      /* Ensures long lines wrap */
+    word-wrap: break-word;      /* Breaks long words if needed */
+}
+
+code {
+    font-family: 'Courier New', Courier, monospace; /* Classic monospaced font */
+    font-size: 12pt;
+}
