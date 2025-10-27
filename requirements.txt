@@ -2,3 +2,5 @@ PySide6
 pypdf
 Markdown
 Pygments
+python-markdown-math
+pymdown-extensions
