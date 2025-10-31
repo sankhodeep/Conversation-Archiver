@@ -51,3 +51,35 @@ code {
     font-family: 'Courier New', Courier, monospace; /* Classic monospaced font */
     font-size: 12pt;
 }
+/* --- Table Styles --- */
+.content table, table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1em;
+    font-size: 11pt;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.03);
+}
+
+table th, .content th {
+    background: #f7f7f7;
+    color: #333;
+    font-weight: bold;
+    padding: 10px 8px;
+    border: 1px solid #e0e0e0;
+    text-align: left;
+}
+
+table td, .content td {
+    padding: 10px 8px;
+    border: 1px solid #e0e0e0;
+    color: #222;
+}
+
+table tr:nth-child(even) {
+    background: #fafafa;
+}
+
+table tr:hover {
+    background: #f0f4ff;
+}
