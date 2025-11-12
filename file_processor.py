@@ -1,20 +1,26 @@
 import json
 
 def process_conversation_file(file_path):
-    """
-    Reads a conversation file, extracts the user and model chunks (including images),
-    and returns them as a list of dictionaries.
+    """Parses a conversation file to extract user and model conversation chunks.
+
+    This function reads a file that contains conversation data embedded as a JSON
+    object. It processes the 'chunkedPrompt' section of the JSON, pairing user
+    prompts with their subsequent model responses. It handles both text and inline
+    image data from the model.
 
     Args:
-        file_path (str): The path to the input file.
+        file_path (str): The path to the conversation input file.
 
     Returns:
-        list: A list of dictionaries, where each dictionary represents a
-              conversation part. It can contain 'user_text', 'model_text',
-              and/or 'model_image'. Returns an empty list if an error occurs.
+        list[dict]: A list of dictionaries, where each dictionary represents a
+        conversation turn (a user prompt and its corresponding model response).
+        Each dictionary can contain 'user_text', 'model_text', and 'model_image'.
 
     Raises:
-        ValueError: If the file content is invalid (e.g., no JSON found).
+        FileNotFoundError: If the specified `file_path` does not exist.
+        ValueError: If the file does not contain valid JSON or if the JSON
+            format is not as expected.
+        json.JSONDecodeError: If the JSON content within the file is malformed.
     """
     try:
         with open(file_path, "r", encoding="utf-8") as f:
