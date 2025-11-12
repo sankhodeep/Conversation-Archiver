@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
         recovery_layout.addRow(QLabel("<h3>Recovery Information</h3>"))
 
         self.chat_platform_combo = QComboBox()
-        self.chat_platform_combo.addItems(["ChatGPT", "Gemini", "Claude"])
+        self.chat_platform_combo.addItems(["ChatGPT", "Gemini", "Claude", "Qwen"])
         self.chat_platform_combo.setEditable(True)
         recovery_layout.addRow("Chat Platform:", self.chat_platform_combo)
 
@@ -628,7 +628,8 @@ class MainWindow(QMainWindow):
                 QApplication.processEvents()
 
                 try:
-                    chunks = process_conversation_file(file_path)
+                    platform_name = self.chat_platform_combo.currentText()
+                    chunks = process_conversation_file(file_path, platform_name)
                     if not chunks:
                         QMessageBox.warning(self, "No Content", f"No conversation chunks found in {file_name}.")
                         continue
