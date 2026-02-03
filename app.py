@@ -3,6 +3,8 @@ import os
 import threading
 import json
 import queue
+import difflib
+import base64
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTextEdit, QPushButton, QLabel, QFileDialog, QMessageBox,
@@ -326,6 +328,19 @@ class PdfWorker(QObject):
 
                 chunks, main_pdf_path, show_headings, user_heading, model_heading, recovery_info = task
 
+                # --- Load Latest Mapping ---
+                mappings_dir = "mappings"
+                latest_mapping = []
+                if os.path.exists(mappings_dir):
+                    mapping_files = [f for f in os.listdir(mappings_dir) if f.startswith("mapping_") and f.endswith(".json")]
+                    if mapping_files:
+                        latest_mapping_file = sorted(mapping_files)[-1]
+                        try:
+                            with open(os.path.join(mappings_dir, latest_mapping_file), 'r', encoding='utf-8') as f:
+                                latest_mapping = json.load(f)
+                        except Exception as e:
+                            print(f"Error loading mapping: {e}")
+
                 # --- Handle Recovery Info ---
                 if recovery_info:
                     self.signals.progress.emit(f"Creating recovery page for {recovery_info.get('export_file_name', 'file')}...")
@@ -343,17 +358,48 @@ class PdfWorker(QObject):
                     self.signals.progress.emit(f"Processing chunk {i + 1}/{total_chunks} for {recovery_info.get('export_file_name', 'file')}...")
                     user_text = chunk.get("user_text", "") if chunk.get("include_user", False) else ""
                     model_text = chunk.get("model_text", "") if chunk.get("include_model", False) else ""
-                    model_image = chunk.get("model_image") if chunk.get("include_model", False) else None
+                    
+                    # Handle multiple images (existing + supplemental)
+                    model_images = []
+                    if chunk.get("include_model", False):
+                        # Add existing image from export if any
+                        existing_img = chunk.get("model_image")
+                        if existing_img:
+                            model_images.append(existing_img)
+                        
+                        # Add supplemental images via fuzzy matching
+                        if model_text and latest_mapping:
+                            for item in latest_mapping:
+                                snippet = item.get("text_snippet", "")
+                                if not snippet: continue
+                                
+                                # Use ratio for fuzzy match
+                                ratio = difflib.SequenceMatcher(None, model_text, snippet).ratio()
+                                if ratio > 0.9: # High confidence match
+                                    img_paths = item.get("image_paths", [])
+                                    # Fallback for old single image format
+                                    if not img_paths and item.get("image_path"):
+                                        img_paths = [item.get("image_path")]
+                                    
+                                    for img_path in img_paths:
+                                        if img_path and os.path.exists(img_path):
+                                            try:
+                                                with open(img_path, "rb") as f:
+                                                    data = base64.b64encode(f.read()).decode('utf-8')
+                                                    model_images.append({"mimeType": "image/png", "data": data})
+                                            except Exception as e:
+                                                print(f"Error reading supplemental image: {e}")
+
                     user_response_num = chunk.get("user_response_num")
                     model_response_num = chunk.get("model_response_num")
 
-                    if not user_text and not model_text and not model_image:
+                    if not user_text and not model_text and not model_images:
                         continue
 
                     temp_page_path = "_temp_page.pdf"
                     create_pdf_page(
                         user_text=user_text, model_text=model_text,
-                        model_image=model_image, output_path=temp_page_path,
+                        model_images=model_images, output_path=temp_page_path,
                         show_headings=show_headings, user_heading=user_heading,
                         model_heading=model_heading, user_response_num=user_response_num,
                         model_response_num=model_response_num, recovery_info=None

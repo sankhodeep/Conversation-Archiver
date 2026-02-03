@@ -150,7 +150,7 @@ def format_recovery_info(recovery_info):
     html_block += "</table></div>"
     return html_block
 
-def create_pdf_page(user_text, model_text, output_path, model_image=None, show_headings=True, user_heading="User Message", model_heading="Model Response", user_response_num=None, model_response_num=None, recovery_info=None):
+def create_pdf_page(user_text, model_text, output_path, model_images=None, show_headings=True, user_heading="User Message", model_heading="Model Response", user_response_num=None, model_response_num=None, recovery_info=None):
     """Creates a single, styled PDF page from text and optional image data.
 
     This function generates a temporary HTML file with embedded CSS, populates it
@@ -161,8 +161,8 @@ def create_pdf_page(user_text, model_text, output_path, model_image=None, show_h
         user_text (str): The text of the user's message.
         model_text (str): The text of the model's response.
         output_path (str): The file path where the generated PDF page will be saved.
-        model_image (dict, optional): A dictionary containing 'mimeType' and base64
-            'data' for an image. Defaults to None.
+        model_images (list[dict], optional): A list of dictionaries containing 'mimeType' and base64
+            'data' for images. Defaults to None.
         show_headings (bool, optional): Whether to include headings for user/model
             sections. Defaults to True.
         user_heading (str, optional): The text for the user message heading.
@@ -201,9 +201,9 @@ def create_pdf_page(user_text, model_text, output_path, model_image=None, show_h
             user_section += f"<div class='content'>{user_text_html}</div>"
 
         model_section = ""
-        if model_text or model_image:
+        if model_text or model_images:
             if show_headings and model_heading:
-                if model_text or (model_image and not model_text):
+                if model_text or (model_images and not model_text):
                     heading_html = f"<span>{html.escape(model_heading)}</span>"
                     # if model_response_num is not None:
                     #     heading_html += f"<span class='response-number'>{model_response_num}</span>"
@@ -213,18 +213,19 @@ def create_pdf_page(user_text, model_text, output_path, model_image=None, show_h
                 model_text_html = markdown_to_html_final(model_text)
                 model_section += f"<div class='content'>{model_text_html}</div>"
 
-            if model_image:
-                try:
-                    mime_type = model_image.get("mimeType", "image/png")
-                    data = model_image.get("data", "")
-                    if not data:
-                        raise ValueError("Image data is empty")
-                    # The 'data' from the file is already base64, so we create a data URI
-                    image_uri = f"data:{mime_type};base64,{data}"
-                    model_section += f'<img src="{image_uri}" alt="Generated Image" style="max-width: 100%; height: auto;">'
-                except Exception as e:
-                    print(f"Warning: Could not process image. Error: {e}")
-                    model_section += "<p><i>[Image could not be processed]</i></p>"
+            if model_images:
+                for img in model_images:
+                    try:
+                        mime_type = img.get("mimeType", "image/png")
+                        data = img.get("data", "")
+                        if not data:
+                            raise ValueError("Image data is empty")
+                        # The 'data' from the file is already base64, so we create a data URI
+                        image_uri = f"data:{mime_type};base64,{data}"
+                        model_section += f'<img src="{image_uri}" alt="Generated Image" style="max-width: 100%; height: auto; margin-top: 10px;">'
+                    except Exception as e:
+                        print(f"Warning: Could not process image. Error: {e}")
+                        model_section += "<p><i>[Image could not be processed]</i></p>"
 
         # --- 3. Create the temporary HTML file with Embedded CSS ---
         # This is the key to making the fonts and emojis work perfectly.
