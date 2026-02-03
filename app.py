@@ -376,17 +376,26 @@ class PdfWorker(QObject):
                                 # Use ratio for fuzzy match
                                 ratio = difflib.SequenceMatcher(None, model_text, snippet).ratio()
                                 if ratio > 0.9: # High confidence match
-                                    img_paths = item.get("image_paths", [])
-                                    # Fallback for old single image format
-                                    if not img_paths and item.get("image_path"):
-                                        img_paths = [item.get("image_path")]
+                                    img_objs = item.get("images", [])
+                                    # Fallback for old formats
+                                    if not img_objs:
+                                        img_paths = item.get("image_paths", [])
+                                        if not img_paths and item.get("image_path"):
+                                            img_paths = [item.get("image_path")]
+                                        img_objs = [{"path": p, "desc": ""} for p in img_paths]
                                     
-                                    for img_path in img_paths:
+                                    for img_obj in img_objs:
+                                        img_path = img_obj.get("path")
+                                        img_desc = img_obj.get("desc", "")
                                         if img_path and os.path.exists(img_path):
                                             try:
                                                 with open(img_path, "rb") as f:
                                                     data = base64.b64encode(f.read()).decode('utf-8')
-                                                    model_images.append({"mimeType": "image/png", "data": data})
+                                                    model_images.append({
+                                                        "mimeType": "image/png",
+                                                        "data": data,
+                                                        "description": img_desc
+                                                    })
                                             except Exception as e:
                                                 print(f"Error reading supplemental image: {e}")
 

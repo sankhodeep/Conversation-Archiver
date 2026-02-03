@@ -59,7 +59,7 @@ class SupplementaryImagesApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Supplementary Image Mapper")
-        self.setGeometry(100, 100, 1000, 800)
+        self.setGeometry(100, 100, 1100, 800)
         
         # Directories
         self.supplemental_dir = "supplemental_images"
@@ -72,16 +72,17 @@ class SupplementaryImagesApp(QMainWindow):
         self.main_layout = QVBoxLayout(self.central_widget)
 
         # Instructions
-        instr = QLabel("<b>Instructions:</b> 1. Add a row. 2. Paste your image. 3. Paste the full Model Response text. 4. Click Save.")
+        instr = QLabel("<b>Instructions:</b> 1. Add a row. 2. Paste your image. 3. (Optional) Add a description. 4. Paste the full Model Response text (only needed for the first image in a group). 5. Click Save.")
         instr.setWordWrap(True)
         self.main_layout.addWidget(instr)
 
         # Table setup
-        self.table = QTableWidget(0, 2)
-        self.table.setHorizontalHeaderLabels(["Image (Screenshot / Clipboard)", "Full Model Response Text"])
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Image (Screenshot)", "Description (Optional)", "Full Model Response Text"])
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Fixed)
-        self.table.setColumnWidth(0, 300)
+        self.table.setColumnWidth(0, 250)
         self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.table.verticalHeader().setDefaultSectionSize(180)
         self.main_layout.addWidget(self.table)
 
@@ -110,12 +111,19 @@ class SupplementaryImagesApp(QMainWindow):
         row = self.table.rowCount()
         self.table.insertRow(row)
         
+        # Col 0: Paste Area
         paste_cell = ImagePasteCell()
         self.table.setCellWidget(row, 0, paste_cell)
         
+        # Col 1: Description
+        desc_edit = QTextEdit()
+        desc_edit.setPlaceholderText("Enter image caption (optional)...")
+        self.table.setCellWidget(row, 1, desc_edit)
+        
+        # Col 2: Text Snippet
         snippet_edit = QTextEdit()
-        snippet_edit.setPlaceholderText("Paste the corresponding AI response here...")
-        self.table.setCellWidget(row, 1, snippet_edit)
+        snippet_edit.setPlaceholderText("Paste AI response here (Sticky Snippet logic applies)...")
+        self.table.setCellWidget(row, 2, snippet_edit)
 
     def remove_row(self):
         current_row = self.table.currentRow()
@@ -126,42 +134,46 @@ class SupplementaryImagesApp(QMainWindow):
         mapping_data = []
         
         current_snippet = None
-        current_images = []
+        current_images = [] # List of {"path": ..., "desc": ...}
 
         for row in range(self.table.rowCount()):
             paste_cell = self.table.cellWidget(row, 0)
-            snippet_edit = self.table.cellWidget(row, 1)
+            desc_edit = self.table.cellWidget(row, 1)
+            snippet_edit = self.table.cellWidget(row, 2)
             
             image_path = paste_cell.image_path
+            description = desc_edit.toPlainText().strip()
             text_content = snippet_edit.toPlainText().strip()
             
             if not image_path:
                 continue
 
+            img_obj = {"path": image_path, "desc": description}
+
             if text_content:
-                # If we were collecting images for a previous snippet, save them first
+                # Save previous group
                 if current_snippet and current_images:
                     mapping_data.append({
                         "text_snippet": current_snippet,
-                        "image_paths": current_images
+                        "images": current_images
                     })
                 
-                # Start new collection
+                # Start new group
                 current_snippet = text_content
-                current_images = [image_path]
+                current_images = [img_obj]
             else:
-                # No text in this row, inherit from above if possible
+                # Inherit snippet from above
                 if current_snippet:
-                    current_images.append(image_path)
+                    current_images.append(img_obj)
                 else:
-                    # Optional: Warn user that the first row must have text?
+                    # Ignore first row if no snippet
                     pass
 
-        # Add the final group
+        # Add last group
         if current_snippet and current_images:
             mapping_data.append({
                 "text_snippet": current_snippet,
-                "image_paths": current_images
+                "images": current_images
             })
 
         if not mapping_data:
@@ -178,10 +190,6 @@ class SupplementaryImagesApp(QMainWindow):
                 json.dump(mapping_data, f, indent=4, ensure_ascii=False)
             
             QMessageBox.information(self, "Success", f"Mapping saved successfully!\nFile: {filename}\n\nYou can now run the Conversation Archiver.")
-            
-            # Optional: Clear table after save? Maybe better to keep it?
-            # self.table.setRowCount(0)
-            # self.add_row()
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save mapping: {e}")

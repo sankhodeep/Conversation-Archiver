@@ -218,11 +218,17 @@ def create_pdf_page(user_text, model_text, output_path, model_images=None, show_
                     try:
                         mime_type = img.get("mimeType", "image/png")
                         data = img.get("data", "")
+                        description = img.get("description", "")
                         if not data:
                             raise ValueError("Image data is empty")
+                        
+                        # Add description if present
+                        if description:
+                            model_section += f'<p class="image-description">{html.escape(description)}</p>'
+                        
                         # The 'data' from the file is already base64, so we create a data URI
                         image_uri = f"data:{mime_type};base64,{data}"
-                        model_section += f'<img src="{image_uri}" alt="Generated Image" style="max-width: 100%; height: auto; margin-top: 10px;">'
+                        model_section += f'<img src="{image_uri}" alt="Generated Image" style="max-width: 100%; height: auto; margin-bottom: 20px;">'
                     except Exception as e:
                         print(f"Warning: Could not process image. Error: {e}")
                         model_section += "<p><i>[Image could not be processed]</i></p>"

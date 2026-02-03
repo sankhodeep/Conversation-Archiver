@@ -62,6 +62,18 @@ code {
     font-size: 12pt;
 }
 
+/* --- Image Description Styling --- */
+.image-description {
+    font-size: 11pt;
+    font-style: italic;
+    font-weight: bold;
+    color: #333;
+    margin-top: 15px;
+    margin-bottom: 5px;
+    border-left: 3px solid #ccc;
+    padding-left: 10px;
+}
+
 /* --- Content Wrapper --- */
 .content {
     /* This class is a wrapper for the markdown-generated content */
