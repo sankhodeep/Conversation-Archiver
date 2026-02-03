@@ -5,6 +5,7 @@ import json
 import queue
 import difflib
 import base64
+import re
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QTextEdit, QPushButton, QLabel, QFileDialog, QMessageBox,
@@ -42,10 +43,17 @@ class FileSelectionDialog(QDialog):
         self.list_widget = QListWidget()
         self.list_widget.setDragDropMode(QListWidget.InternalMove)
 
-        for file in files:
+        total_files = len(files)
+        for i, file in enumerate(files):
             item = QListWidgetItem(file)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Checked)
+            
+            # Default: Only check the latest file (the last one in the list)
+            if i == total_files - 1:
+                item.setCheckState(Qt.Checked)
+            else:
+                item.setCheckState(Qt.Unchecked)
+                
             self.list_widget.addItem(item)
 
         layout.addWidget(self.list_widget)
@@ -92,6 +100,7 @@ class ChunkWidgetItem(QWidget):
             parent (QWidget, optional): The parent widget. Defaults to None.
         """
         super().__init__(parent)
+        self.raw_user_text = user_text # Store raw text for smart filtering
         self.layout = QVBoxLayout(self)
         self.layout.setContentsMargins(10, 10, 10, 10)
 
@@ -247,13 +256,40 @@ class ChunkSelectionDialog(QDialog):
             widget.model_check.setChecked(True)
 
     def apply_model_only(self):
-        """Unchecks all User Message boxes and checks all Model Response boxes."""
-        for widget in self.chunk_widgets:
-            # Ensure the chunk itself is included
+        """Smart filter: Hides short generic acknowledgments but keeps meaningful questions and the last message."""
+        # Generic acknowledgment patterns and words
+        ack_patterns = [
+            "hmm clear", "hmm bujhechi", "hmm sob clear", "hmm sob bujhechi",
+            "khub bhalo bujhiyecho", "clear", "bujhechi", "okay", "ok", "hmm"
+        ]
+        
+        total_widgets = len(self.chunk_widgets)
+        for i, widget in enumerate(self.chunk_widgets):
             widget.main_check.setChecked(True)
-            # Exclude user, include model
-            widget.user_check.setChecked(False)
             widget.model_check.setChecked(True)
+            
+            # Rule 1: Always keep the LAST message (concluding remarks)
+            if i == total_widgets - 1:
+                widget.user_check.setChecked(True)
+                continue
+            
+            # Rule 2: Length and Content based filtering
+            user_text = widget.raw_user_text.lower().strip()
+            # Remove punctuation and emojis for cleaner matching
+            clean_text = re.sub(r'[^\w\s]', '', user_text)
+            words = clean_text.split()
+            
+            is_generic_ack = False
+            # Check if it's a short message (1-3 words)
+            if 1 <= len(words) <= 3:
+                # Check if it matches any acknowledgment pattern
+                if any(pattern in clean_text for pattern in ack_patterns):
+                    is_generic_ack = True
+            
+            if is_generic_ack:
+                widget.user_check.setChecked(False)
+            else:
+                widget.user_check.setChecked(True)
 
     def get_selected_chunks(self):
         """Constructs a list of selected chunks based on the user's choices.
