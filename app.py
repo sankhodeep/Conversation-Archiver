@@ -228,6 +228,10 @@ class ChunkSelectionDialog(QDialog):
             self.list_layout.addWidget(widget)
             self.chunk_widgets.append(widget)
 
+        # Default: Uncheck the first user message (often just pasted text)
+        if self.chunk_widgets:
+            self.chunk_widgets[0].user_check.setChecked(False)
+
         # --- Dialog Buttons ---
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.accept)
@@ -271,6 +275,11 @@ class ChunkSelectionDialog(QDialog):
             # Rule 1: Always keep the LAST message (concluding remarks)
             if i == total_widgets - 1:
                 widget.user_check.setChecked(True)
+                continue
+
+            # Rule 2: Always UNCHECK the first user message
+            if i == 0:
+                widget.user_check.setChecked(False)
                 continue
             
             # Rule 2: Length and Content based filtering
