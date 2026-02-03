@@ -31,6 +31,13 @@ async function generatePdf() {
             waitUntil: 'networkidle0'
         });
 
+        // Wait for Mermaid to finish rendering if it exists
+        await page.evaluate(async () => {
+            if (typeof mermaid !== 'undefined') {
+                await mermaid.run();
+            }
+        });
+
         // Generate the PDF
         await page.pdf({
             path: '_temp_page.pdf', // The Python script will look for this file

@@ -187,6 +187,15 @@ class ChunkSelectionDialog(QDialog):
         apply_button = QPushButton("Apply")
         apply_button.clicked.connect(self.apply_start_from)
         start_from_layout.addWidget(apply_button)
+
+        select_all_button = QPushButton("Select All")
+        select_all_button.clicked.connect(self.apply_select_all)
+        start_from_layout.addWidget(select_all_button)
+
+        model_only_button = QPushButton("Model Only")
+        model_only_button.clicked.connect(self.apply_model_only)
+        start_from_layout.addWidget(model_only_button)
+
         main_layout.addLayout(start_from_layout)
 
         # --- Scroll Area for Chunks ---
@@ -227,6 +236,22 @@ class ChunkSelectionDialog(QDialog):
 
         except ValueError:
             QMessageBox.warning(self, "Invalid Input", "Please enter a valid number.")
+
+    def apply_select_all(self):
+        """Checks all chunks and all sub-boxes."""
+        for widget in self.chunk_widgets:
+            widget.main_check.setChecked(True)
+            widget.user_check.setChecked(True)
+            widget.model_check.setChecked(True)
+
+    def apply_model_only(self):
+        """Unchecks all User Message boxes and checks all Model Response boxes."""
+        for widget in self.chunk_widgets:
+            # Ensure the chunk itself is included
+            widget.main_check.setChecked(True)
+            # Exclude user, include model
+            widget.user_check.setChecked(False)
+            widget.model_check.setChecked(True)
 
     def get_selected_chunks(self):
         """Constructs a list of selected chunks based on the user's choices.
@@ -620,7 +645,7 @@ class MainWindow(QMainWindow):
             QApplication.processEvents() # Update UI
 
             # Initialize a counter for the entire batch
-            response_counter = 1
+            # response_counter = 1
 
             for file_name in selected_files:
                 file_path = os.path.join(folder_path, file_name)
@@ -641,13 +666,13 @@ class MainWindow(QMainWindow):
                     selected_chunks = chunk_dialog.get_selected_chunks()
 
                     # Add numbering
-                    for chunk in selected_chunks:
-                        if chunk.get("include_user") and chunk.get("user_text"):
-                            chunk["user_response_num"] = response_counter
-                            response_counter += 1
-                        if chunk.get("include_model") and (chunk.get("model_text") or chunk.get("model_image")):
-                            chunk["model_response_num"] = response_counter
-                            response_counter += 1
+                    # for chunk in selected_chunks:
+                    #     if chunk.get("include_user") and chunk.get("user_text"):
+                    #         chunk["user_response_num"] = response_counter
+                    #         response_counter += 1
+                    #     if chunk.get("include_model") and (chunk.get("model_text") or chunk.get("model_image")):
+                    #         chunk["model_response_num"] = response_counter
+                    #         response_counter += 1
 
                     # --- Gather Recovery Info for this specific file ---
                     recovery_info = {

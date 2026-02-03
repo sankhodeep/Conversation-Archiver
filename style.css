@@ -47,6 +47,21 @@ p {
     /* The browser engine will handle line breaks correctly, so pre-wrap is not needed */
 }
 
+/* --- Code Block Styling --- */
+pre {
+    background-color: #f4f4f4; /* Light gray background */
+    border: 1px solid #ddd;     /* Subtle border */
+    border-radius: 4px;         /* Rounded corners */
+    padding: 1em;               /* A little space around the code */
+    white-space: pre-wrap;      /* Ensures long lines wrap */
+    word-wrap: break-word;      /* Breaks long words if needed */
+}
+
+code {
+    font-family: 'Courier New', Courier, monospace; /* Classic monospaced font */
+    font-size: 12pt;
+}
+
 /* --- Content Wrapper --- */
 .content {
     /* This class is a wrapper for the markdown-generated content */

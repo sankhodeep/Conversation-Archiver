@@ -3,6 +3,75 @@ import subprocess
 from pypdf import PdfWriter, PdfReader
 import html
 import markdown
+import re
+from pygments import highlight
+from pygments.lexers import get_lexer_by_name, TextLexer
+from pygments.formatters import HtmlFormatter
+
+def markdown_to_html_final(markdown_text):
+    """
+    Converts a Markdown string to HTML, with special handling for code blocks.
+
+    This function finds all fenced code blocks, highlights them using Pygments,
+    replaces them with placeholders, converts the remaining Markdown to HTML,
+    and then re-injects the highlighted code blocks back into the HTML.
+
+    Args:
+        markdown_text (str): The Markdown text to convert.
+
+    Returns:
+        str: The fully-formatted HTML.
+    """
+    highlighted_blocks = []
+
+    def _highlight_and_replace(match):
+        language = match.group(1).strip()
+        content = match.group(2).strip()
+        if language.lower() == 'mermaid':
+            placeholder = f"MERMAIDBLOCK{len(highlighted_blocks)}"
+            highlighted_blocks.append(f'<pre class="mermaid">{content}</pre>')
+            return placeholder
+
+        placeholder = f"CODEBLOCK{len(highlighted_blocks)}"
+
+        try:
+            lexer = get_lexer_by_name(language)
+        except Exception:
+            lexer = TextLexer()
+
+        formatter = HtmlFormatter(cssclass="codehilite")
+        highlighted_code = highlight(content, lexer, formatter)
+        highlighted_blocks.append(highlighted_code)
+
+        # Return a simple placeholder that won't be altered by markdown processing
+        return placeholder
+
+    # 1. Find all code blocks, highlight them, and replace with a simple placeholder.
+    pattern = re.compile(r"^[ \t]*```([^\n]*)\n(.*?)\n^[ \t]*```", re.DOTALL | re.MULTILINE)
+    text_with_placeholders = pattern.sub(_highlight_and_replace, markdown_text)
+
+    # 2. Process the main text (which now contains only placeholders).
+    html_output = markdown.markdown(
+        text_with_placeholders,
+        extensions=['tables', 'nl2br', 'pymdownx.arithmatex'],
+        extension_configs={
+            'pymdownx.arithmatex': {'generic': True}
+        }
+    )
+
+    # 3. Replace the placeholders with the fully rendered HTML for the code blocks.
+    for i, block_html in enumerate(highlighted_blocks):
+        # Handle both CODEBLOCK and MERMAIDBLOCK
+        # The markdown processor might wrap the placeholder in <p> tags.
+        for prefix in ["CODEBLOCK", "MERMAIDBLOCK"]:
+            placeholder = f"{prefix}{i}"
+            placeholder_p = f"<p>{placeholder}</p>"
+            if placeholder_p in html_output:
+                html_output = html_output.replace(placeholder_p, block_html)
+            else:
+                html_output = html_output.replace(placeholder, block_html)
+
+    return html_output
 
 def merge_pdfs(main_pdf_path, new_page_path):
     """Merges a new PDF page into a main PDF file.
@@ -125,10 +194,10 @@ def create_pdf_page(user_text, model_text, output_path, model_image=None, show_h
         if user_text:
             if show_headings and user_heading:
                 heading_html = f"<span>{html.escape(user_heading)}</span>"
-                if user_response_num is not None:
-                    heading_html += f"<span class='response-number'>{user_response_num}</span>"
+                # if user_response_num is not None:
+                #     heading_html += f"<span class='response-number'>{user_response_num}</span>"
                 user_section += f"<div class='heading-container'><h1>{heading_html}</h1></div>"
-            user_text_html = markdown.markdown(user_text, extensions=['tables', 'nl2br'])
+            user_text_html = markdown_to_html_final(user_text)
             user_section += f"<div class='content'>{user_text_html}</div>"
 
         model_section = ""
@@ -136,12 +205,12 @@ def create_pdf_page(user_text, model_text, output_path, model_image=None, show_h
             if show_headings and model_heading:
                 if model_text or (model_image and not model_text):
                     heading_html = f"<span>{html.escape(model_heading)}</span>"
-                    if model_response_num is not None:
-                        heading_html += f"<span class='response-number'>{model_response_num}</span>"
+                    # if model_response_num is not None:
+                    #     heading_html += f"<span class='response-number'>{model_response_num}</span>"
                     model_section += f"<div class='heading-container'><h1>{heading_html}</h1></div>"
 
             if model_text:
-                model_text_html = markdown.markdown(model_text, extensions=['tables', 'nl2br'])
+                model_text_html = markdown_to_html_final(model_text)
                 model_section += f"<div class='content'>{model_text_html}</div>"
 
             if model_image:
@@ -168,6 +237,11 @@ def create_pdf_page(user_text, model_text, output_path, model_image=None, show_h
             <link rel="preconnect" href="https://fonts.googleapis.com">
             <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
             <link href="https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+            <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+            <script>
+                mermaid.initialize({{ startOnLoad: true }});
+            </script>
             <style>
                 {css_content}
             </style>

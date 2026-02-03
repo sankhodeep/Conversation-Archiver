@@ -1,7 +1,7 @@
 # Python
 __pycache__/
 *.pyc
-
+configs.json
 # Temporary files
 _temp.html
 _temp_page.pdf
