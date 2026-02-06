@@ -19,3 +19,7 @@ node_modules/
 My_AI_Notes_TEST.pdf
 # Distribution artifacts
 dist/
+
+# Project specific ignores
+mappings/
+supplemental_images/
