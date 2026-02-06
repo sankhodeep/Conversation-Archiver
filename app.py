@@ -651,7 +651,8 @@ class MainWindow(QMainWindow):
                 "chat_account": self.chat_account_entry.text(),
                 "extra_notes": self.extra_notes_text.toPlainText(),
                 "user_heading": self.user_heading_entry.text(),
-                "model_heading": self.model_heading_entry.text()
+                "model_heading": self.model_heading_entry.text(),
+                "pdf_path": self.pdf_path_label.text()
             }
             self._save_all_configs()
             self._populate_configs_combo()
@@ -669,6 +670,7 @@ class MainWindow(QMainWindow):
                 self.extra_notes_text.setPlainText(config_data.get("extra_notes", ""))
                 self.user_heading_entry.setText(config_data.get("user_heading", "User Message"))
                 self.model_heading_entry.setText(config_data.get("model_heading", "Model Response"))
+                self.pdf_path_label.setText(config_data.get("pdf_path", "No file selected..."))
 
     def delete_configuration(self):
         """Deletes the currently selected configuration after confirming with the user."""
@@ -727,7 +729,18 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            all_files = sorted([f for f in os.listdir(folder_path) if not f.startswith('.')])
+            # Sort files by modification time (latest first at the bottom)
+            all_files_with_time = []
+            for f in os.listdir(folder_path):
+                if not f.startswith('.'):
+                    fpath = os.path.join(folder_path, f)
+                    if os.path.isfile(fpath):
+                        all_files_with_time.append((f, os.path.getmtime(fpath)))
+            
+            # Sort ascending by time (newest at the end)
+            all_files_with_time.sort(key=lambda x: x[1])
+            all_files = [f[0] for f in all_files_with_time]
+
             if not all_files:
                 QMessageBox.information(self, "No Files Found", "The selected folder is empty.")
                 return
