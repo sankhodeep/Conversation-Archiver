@@ -260,12 +260,38 @@ class ChunkSelectionDialog(QDialog):
             widget.model_check.setChecked(True)
 
     def apply_model_only(self):
-        """Smart filter: Hides short generic acknowledgments but keeps meaningful questions and the last message."""
+        """Smart filter: Hides short generic acknowledgments, correction requests, and keeps meaningful content."""
         # Generic acknowledgment patterns and words
         ack_patterns = [
             "hmm clear", "hmm bujhechi", "hmm sob clear", "hmm sob bujhechi",
             "khub bhalo bujhiyecho", "clear", "bujhechi", "okay", "ok", "hmm"
         ]
+
+        # Template for rectification requests
+        rectify_template = (
+            "Achha ...\n"
+            "Tumi je last response ta korecho sekhane amar kichu line e confusion ache...\n"
+            "ami line gulo bole dicchi...ar tar sathe etao bole dicchi je ki confusion ache amar oi line gulo te...\n"
+            "tumi oi line gulo clarify kore dao.\n\n"
+            "Ar tumi tomar respose ta bhalo kore pore dekho...\n"
+            "jodi tomar mone hoi je kono part e tumi kichu bhool bolecho, ba kono explanation jeta tomar unclear mone hocche, ba mone hocche je factually incorrect seta rectify kore dao.\n"
+            "Ba most commonly jeta hoi hoito tumi kono line e likhte giye bhool kore felecho, jamon kono word ke bhool likhecho(mane bhool type korecho), segulo thik kore debe.\n"
+            "Ami akta example dicchi:\n"
+            "dhoro tumi akta line eibhabe likhecho\n"
+            "\"Jodi blood sugar barai, tahole insulin dile hobe na, potassium dibe.\"\n\n"
+            "Ebar dekho ei line ekotogulo bhool ache\n"
+            "1)Prothom bhool holo \"barai\" word ta ekhane appropriate na, ekhane likhte hoto \"beshi hoi\", erokom onek bhool jegulor jonno sentence ta baje shunte lage segulo thik korbe.\n"
+            "2)Second holo factual error. Tumi bolte cheyechile \"tahole sudhu insulin dilei hobe na\"\n"
+            "karon blood sugar kom thakle insulin toh dite hobei, tar sathe potassium add korte hobe.\n"
+            "3)Third holo ekhane likhte hoto \"potassium o dite hobe\". \"Potassium dibe\" sentence ta khub kharap shonacche, bangla te lok eibhabe kotha bole na. Toh tumi jodi bhool kore erokom kono mistake kore thako, segulo pore khuje bar kore thik korar chesta korbe.\n\n"
+            "Tahole corrected sentence ta holo\n"
+            "\"Jodi blood sugar besi thake, tahole sudhu insulin dilei hobe na, potassium o dite hobe.\"\n\n"
+            "Ar ei sob kichu korar por, tomar previous response ta abar likhbe.\n"
+            "Kono unnecessary change korbe na response e.\n"
+            "****Ar kono commentary korbe na, sudhu tomar response ta abar likhe debe correct kore, jegulo correct korte bollam.****\n"
+            "Actually ami tomar response gulo save kore rakhi, tai jodi response e bhool thake tahole amar revision e problem hobe, ami hoito bhool sikhbo. Tai tomake bollam."
+        ).lower()
+        template_normalized = re.sub(r'\s+', ' ', rectify_template).strip()
         
         total_widgets = len(self.chunk_widgets)
         for i, widget in enumerate(self.chunk_widgets):
@@ -281,11 +307,26 @@ class ChunkSelectionDialog(QDialog):
             if i == 0:
                 widget.user_check.setChecked(False)
                 continue
+
+            # Rule 3: Fuzzy Template Matching for Rectification Requests
+            user_text_raw = widget.raw_user_text.lower()
+            user_text_normalized = re.sub(r'\s+', ' ', user_text_raw).strip()
             
-            # Rule 2: Length and Content based filtering
-            user_text = widget.raw_user_text.lower().strip()
+            # Compare first 800 chars of normalized text to avoid the variable "Lines" section
+            match_ratio = difflib.SequenceMatcher(None, user_text_normalized[:800], template_normalized[:800]).ratio()
+            
+            if match_ratio > 0.85:
+                # This is a rectification request!
+                # 1. Uncheck this user message
+                widget.user_check.setChecked(False)
+                # 2. Uncheck the PREVIOUS model response (because it was wrong)
+                if i > 0:
+                    self.chunk_widgets[i-1].model_check.setChecked(False)
+                continue
+            
+            # Rule 4: Length and Content based filtering for acknowledgments
             # Remove punctuation and emojis for cleaner matching
-            clean_text = re.sub(r'[^\w\s]', '', user_text)
+            clean_text = re.sub(r'[^\w\s]', '', user_text_normalized)
             words = clean_text.split()
             
             is_generic_ack = False
