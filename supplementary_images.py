@@ -8,10 +8,12 @@ from PySide6.QtWidgets import (
     QHeaderView, QMessageBox, QFileDialog, QScrollArea
 )
 from PySide6.QtGui import QPixmap, QImage, QClipboard, QKeySequence
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal, QTimer
 
 class ImagePasteCell(QWidget):
     """Custom widget for pasting and previewing images in a table cell."""
+    image_pasted = Signal()
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.layout = QVBoxLayout(self)
@@ -50,6 +52,7 @@ class ImagePasteCell(QWidget):
                     self.image_path = path
                     self.preview_label.setPixmap(QPixmap.fromImage(image))
                     self.preview_label.setText("") # Clear text
+                    self.image_pasted.emit()
                 else:
                     QMessageBox.warning(self, "Error", "Failed to save cached image.")
         else:
@@ -66,6 +69,7 @@ class SupplementaryImagesApp(QMainWindow):
         self.mappings_dir = "mappings"
         os.makedirs(self.supplemental_dir, exist_ok=True)
         os.makedirs(self.mappings_dir, exist_ok=True)
+        self.autosave_path = os.path.join(self.mappings_dir, "autosave.json")
 
         self.central_widget = QWidget()
         self.setCentralWidget(self.central_widget)
@@ -97,7 +101,7 @@ class SupplementaryImagesApp(QMainWindow):
         self.remove_row_btn.clicked.connect(self.remove_row)
         self.btn_layout.addWidget(self.remove_row_btn)
 
-        self.save_btn = QPushButton("💾 Save All and Create Mapping")
+        self.save_btn = QPushButton("💾 Save All and Start New Session")
         self.save_btn.setStyleSheet("background-color: #4CAF50; color: white; font-weight: bold; padding: 10px;")
         self.save_btn.clicked.connect(self.save_mapping)
         self.btn_layout.addWidget(self.save_btn)
@@ -113,26 +117,30 @@ class SupplementaryImagesApp(QMainWindow):
         
         # Col 0: Paste Area
         paste_cell = ImagePasteCell()
+        paste_cell.image_pasted.connect(self.auto_save)
         self.table.setCellWidget(row, 0, paste_cell)
         
         # Col 1: Description
         desc_edit = QTextEdit()
         desc_edit.setPlaceholderText("Enter image caption (optional)...")
+        desc_edit.textChanged.connect(self.auto_save)
         self.table.setCellWidget(row, 1, desc_edit)
         
         # Col 2: Text Snippet
         snippet_edit = QTextEdit()
         snippet_edit.setPlaceholderText("Paste AI response here (Sticky Snippet logic applies)...")
+        snippet_edit.textChanged.connect(self.auto_save)
         self.table.setCellWidget(row, 2, snippet_edit)
 
     def remove_row(self):
         current_row = self.table.currentRow()
         if current_row >= 0:
             self.table.removeRow(current_row)
+            self.auto_save()
 
-    def save_mapping(self):
+    def get_mapping_data(self):
+        """Collects all data from the table and formats it into groups."""
         mapping_data = []
-        
         current_snippet = None
         current_images = [] # List of {"path": ..., "desc": ...}
 
@@ -141,6 +149,9 @@ class SupplementaryImagesApp(QMainWindow):
             desc_edit = self.table.cellWidget(row, 1)
             snippet_edit = self.table.cellWidget(row, 2)
             
+            if not paste_cell or not desc_edit or not snippet_edit:
+                continue
+
             image_path = paste_cell.image_path
             description = desc_edit.toPlainText().strip()
             text_content = snippet_edit.toPlainText().strip()
@@ -175,6 +186,31 @@ class SupplementaryImagesApp(QMainWindow):
                 "text_snippet": current_snippet,
                 "images": current_images
             })
+            
+        return mapping_data
+
+    def auto_save(self):
+        """Silently saves the current table state to autosave.json."""
+        data = self.get_mapping_data()
+        if not data:
+            if os.path.exists(self.autosave_path):
+                try: os.remove(self.autosave_path)
+                except: pass
+            return
+
+        try:
+            with open(self.autosave_path, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4, ensure_ascii=False)
+        except Exception as e:
+            print(f"Auto-save failed: {e}")
+
+    def clear_table(self):
+        """Clears the table and adds one fresh row."""
+        self.table.setRowCount(0)
+        self.add_row()
+
+    def save_mapping(self):
+        mapping_data = self.get_mapping_data()
 
         if not mapping_data:
             QMessageBox.warning(self, "No Data", "Please add at least one image and its corresponding text.")
@@ -189,7 +225,14 @@ class SupplementaryImagesApp(QMainWindow):
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(mapping_data, f, indent=4, ensure_ascii=False)
             
-            QMessageBox.information(self, "Success", f"Mapping saved successfully!\nFile: {filename}\n\nYou can now run the Conversation Archiver.")
+            # Clean up after successful manual save
+            if os.path.exists(self.autosave_path):
+                os.remove(self.autosave_path)
+            
+            QMessageBox.information(self, "Success & Cleared",
+                                   f"Mapping saved as: {filename}\n\n"
+                                   "The table has been cleared for your next session! ✨")
+            self.clear_table()
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save mapping: {e}")

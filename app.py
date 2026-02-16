@@ -418,11 +418,14 @@ class PdfWorker(QObject):
                 mappings_dir = "mappings"
                 latest_mapping = []
                 if os.path.exists(mappings_dir):
-                    mapping_files = [f for f in os.listdir(mappings_dir) if f.startswith("mapping_") and f.endswith(".json")]
-                    if mapping_files:
-                        latest_mapping_file = sorted(mapping_files)[-1]
+                    # Find all mapping files (including autosave)
+                    all_mapping_files = [os.path.join(mappings_dir, f) for f in os.listdir(mappings_dir) if f.endswith(".json")]
+                    
+                    if all_mapping_files:
+                        # Pick the truly most recently modified file
+                        latest_mapping_file_path = max(all_mapping_files, key=os.path.getmtime)
                         try:
-                            with open(os.path.join(mappings_dir, latest_mapping_file), 'r', encoding='utf-8') as f:
+                            with open(latest_mapping_file_path, 'r', encoding='utf-8') as f:
                                 latest_mapping = json.load(f)
                         except Exception as e:
                             print(f"Error loading mapping: {e}")
